@@ -139,6 +139,18 @@ check('the default user agent carries the package version', () => {
 	assert.equal(provider.options.userAgent, `dsh-searxng-search/${version}`)
 })
 
+check('shipped files carry no UTF-8 BOM', () => {
+	// DSH reads package.json and the locale JSON with a bare JSON.parse, where a
+	// leading U+FEFF from an editor saving "UTF-8 with BOM" is a fatal error — a
+	// profile manifest with a BOM stops DSH from starting at all.
+	const shipped = ['package.json', 'index.js', 'cordis.patch.yml', 'locale/zh.json', 'locale/en.json']
+	const offenders = shipped.filter((name) => {
+		const bytes = readFileSync(new URL(`../${name}`, import.meta.url))
+		return bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf
+	})
+	assert.deepEqual(offenders, [], `these files start with a UTF-8 BOM: ${offenders.join(', ')}`)
+})
+
 await checkAsync('search() performs one GET against the configured instance', async () => {
 	let seen
 	const server = http.createServer((req, res) => {

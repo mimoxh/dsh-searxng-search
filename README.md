@@ -9,7 +9,7 @@
 - **零依赖**：只用 Node 全局 `fetch` / `URL` / `AbortSignal`，不 import 任何包，无构建步骤。
 - **不改工具契约**：复用 DSH 的 web 能力 seam（`ctx.web`），模型侧仍然是原来的 `web_search` 工具，参数、结果卡片、引用格式全部不变。
 - **不影响 `web_fetch`**：抓取 URL 仍由随附的 `dsh-web-fetch-http` 提供。
-- **离线自测**：15 项检查（`npm test`），不需要网络、不需要安装依赖。
+- **离线自测**：16 项检查（`npm test`），不需要网络、不需要安装依赖，其中一项专门拒绝带 UTF-8 BOM 的发布文件。
 
 > **免责声明**：这是第三方项目，与 DeepSeek 官方无关，也不代表官方背书。
 > DSH 目前是 **developer preview**，本插件针对 `0.2.0-rc.2` 验证过；它依赖的 seam
@@ -227,9 +227,9 @@ SearXNG 的 `results[].url/title/content/publishedDate` → seam 的
 npm test        # 等价于 node test/smoke.mjs
 ```
 
-15 项检查覆盖：注册 id、可用性判断、User-Agent 版本、URL 构造、结果映射/去重/截断、
-真实 HTTP 往返（内置 mock SearXNG）、HTML（未开 JSON）报错、403（未开 JSON 格式）
-报错、429 报错、取消、不可达报错。
+16 项检查覆盖：注册 id、可用性判断、User-Agent 与版本一致、**发布文件不带 UTF-8 BOM**、
+URL 构造、结果映射/去重/截断、真实 HTTP 往返（内置 mock SearXNG）、HTML（未开 JSON）
+报错、403（未开 JSON 格式）报错、429 报错、取消、不可达报错。
 
 ### 5.2 在 DSH 里验证
 
