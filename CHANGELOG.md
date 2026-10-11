@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.2.0 — 2026-10-12
+
+可审计性与跨 surface 版本。插件运行时行为不变。
+
+- **声明 `dsh.seams: ["web"]`**：dsh-vet 的 `perm.network-client` 由 medium/high 降为
+  info/high（规则原话：声明了 web seam 即"预期能力，只作清点"），**产物扫描等级由 C 升到
+  A**（本地实测）。自测新增一项，锁定 `dsh.seams` 与 `inject` 一致，防止声明漂移。
+- **接入 dsh-vet 自审**：`.github/workflows/dsh-vet.yml` 在 push / PR 上审计 `npm pack`
+  产物（而非整仓——整仓扫描会把测试代码算进能力面），`strict: true` 作为 high 及以上的
+  门禁；main 上把报告与等级徽章发布到 `dsh-vet/report` 分支。
+- **新增 `examples/dsh-searxng.overlay.yml`**：用 `dsh --patch` 给任意 profile 叠加配置，
+  不改 profile 文件；`baseURL` 经 `!!js process.env.SEARXNG_BASE_URL ?? '<占位>'` 在组合期
+  求值，同一个文件可跨机器、跨实例复用。
+- **README 补「方式 E / F」与「装到其他 surface 时的两个坑」**：`dsh plugin --profile
+  <name> add` 的安装路径；`web_search`（`tool-web`）在 base（host plane）与 dsh-web-app
+  （agent preset）两层归属不同；桌面端常驻 host 必须完全重启而 CLI surface 下次启动即
+  生效。另记录：`desktop` profile 由 Electron 独占，`dsh --profile desktop …` 会被拒绝。
+- **新增 §5.3 安全自审**：写明实测等级与残留发现项（`egress.secret-adjacent` high/low、
+  `perm.network-client` info/high），以及为什么保留 `process.env` 读取而不引入 import。
+- 自测 16 → 17 项；User-Agent 断言改为从 `package.json` 派生版本，不再硬编码。
+- 版本号 0.1.0 → 0.2.0（`index.js` 的 `PACKAGE_VERSION` 已同步）。
+
 ## 0.1.0 — 2026-10-12
 
 首个公开版本。

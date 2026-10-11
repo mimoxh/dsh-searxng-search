@@ -20,6 +20,9 @@ import {
 	SEARXNG_PROVIDER_ID
 } from '../index.js'
 
+/** The manifest, read once: several checks assert it stays in step with the code. */
+const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+
 const results = []
 function check(label, fn) {
 	try {
@@ -134,16 +137,23 @@ check('section-backed config refs are unwrapped', () => {
 })
 
 check('the default user agent carries the package version', () => {
-	const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
 	const provider = createProvider({ baseURL: 'http://searxng.example:8888' })
-	assert.equal(provider.options.userAgent, `dsh-searxng-search/${version}`)
+	assert.equal(provider.options.userAgent, `dsh-searxng-search/${pkg.version}`)
+})
+
+check('the manifest declares exactly the seams the plugin injects', () => {
+	// dsh-vet's perm.network-client rule reports medium/high for a plugin that
+	// opens network connections without declaring the web seam anywhere;
+	// declaring it turns the same finding into an inventory note. The check is
+	// here so the declaration cannot drift away from what the code injects.
+	assert.deepEqual(pkg.dsh?.seams, inject, 'package.json `dsh.seams` must match the injected seams')
 })
 
 check('shipped files carry no UTF-8 BOM', () => {
 	// DSH reads package.json and the locale JSON with a bare JSON.parse, where a
 	// leading U+FEFF from an editor saving "UTF-8 with BOM" is a fatal error — a
 	// profile manifest with a BOM stops DSH from starting at all.
-	const shipped = ['package.json', 'index.js', 'cordis.patch.yml', 'locale/zh.json', 'locale/en.json']
+	const shipped = ['package.json', 'index.js', 'cordis.patch.yml', 'locale/zh.json', 'locale/en.json', 'examples/dsh-searxng.overlay.yml']
 	const offenders = shipped.filter((name) => {
 		const bytes = readFileSync(new URL(`../${name}`, import.meta.url))
 		return bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf
@@ -166,7 +176,7 @@ await checkAsync('search() performs one GET against the configured instance', as
 		assert.equal(seen.method, 'GET')
 		assert.equal(seen.url, '/search?q=deepseek+harness&format=json&pageno=1&language=zh-CN')
 		assert.equal(seen.headers.accept, 'application/json')
-		assert.equal(seen.headers['user-agent'], 'dsh-searxng-search/0.1.0')
+		assert.equal(seen.headers['user-agent'], `dsh-searxng-search/${pkg.version}`)
 		assert.equal(result.sources.length, 3)
 		assert.equal(result.sources[0].url, 'https://github.com/deepseek-ai/deepseek-harness')
 		assert.equal(result.truncated, false)

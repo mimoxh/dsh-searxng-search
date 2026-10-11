@@ -1,6 +1,6 @@
 {
   "name": "dsh-searxng-search",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "SearXNG search provider for the DSH web capability seam (ctx.web): run DSH's built-in web_search against a SearXNG instance instead of the shipped DeepSeek search route.",
   "type": "module",
   "main": "./index.js",
@@ -13,6 +13,7 @@
     "index.js",
     "cordis.patch.yml",
     "locale/*.json",
+    "examples/*.yml",
     "README.md",
     "LICENSE"
   ],
@@ -47,7 +48,8 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
-    }
+    },
+    "seams": ["web"]
   },
   "meta": {
     "title": "SearXNG Search",

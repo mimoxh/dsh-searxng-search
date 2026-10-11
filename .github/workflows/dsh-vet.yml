@@ -1,0 +1,46 @@
+# 安装前安全自审（dsh-vet）：每次运行产出完整报告作 artifact，main 上把报告与等级
+# 徽章发布到 dsh-vet/report 分支 —— 徽章由 shields.io 直接读该分支的 badge.json，
+# 不经过任何徽章服务，其数值可沿 git 历史审计。
+#
+# 审计对象是**用户真正装到手的产物**：`npm pack` 出来的 tarball（内容由 package.json
+# 的 `files` 决定）。直接扫整仓（specifier: '.'）会把 test/smoke.mjs 也算进来 —— 它读
+# JSON、开 mock HTTP 服务，会多出三条与插件运行时无关的发现项：fs 读取计入
+# perm.seam-mismatch（medium/medium，把整仓扫描的等级压到 C）、node:http 仅 import、
+# 不可达文件。本包发布的是纯 JS，所以 tarball 解包后即可扫描，不需要编译步骤。
+name: dsh-vet
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write # commit-report 要推 dsh-vet/report 分支
+  pull-requests: write # PR 上就地编辑一条 findings 评论
+
+jobs:
+  audit:
+    name: audit (dsh-vet 0.4.0)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Pack the artifact users install
+        run: |
+          set -euo pipefail
+          mkdir -p .dsh-vet-pack/pkg
+          npm pack --pack-destination .dsh-vet-pack >/dev/null
+          tar -xzf .dsh-vet-pack/dsh-searxng-search-*.tgz -C .dsh-vet-pack/pkg
+
+      # Action 自身不带依赖：扫描器由 Action 从 npm 临时安装，本包继续保持零依赖。
+      # 固定到 v0.4.0 的 commit；Action 内的扫描器默认版本与该 tag 一致。
+      - uses: rogerdigital/dsh-vet/action@b8128e6173c9571927aebe49ba5cca39c510fac2 # v0.4.0
+        with:
+          specifier: '.dsh-vet-pack/pkg/package'
+          version: '0.4.0'
+          # high 及以上、且置信度 >= medium 的发现项让 CI 失败（低置信度不参与，
+          # 这与 dsh-vet 的等级契约一致）。
+          strict: 'true'
+          comment: 'true'
+          commit-report: 'true'

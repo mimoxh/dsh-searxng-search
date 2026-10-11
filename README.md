@@ -1,6 +1,7 @@
 # dsh-searxng-search
 
 [![test](https://github.com/mimoxh/dsh-searxng-search/actions/workflows/ci.yml/badge.svg)](https://github.com/mimoxh/dsh-searxng-search/actions/workflows/ci.yml)
+[![dsh-vet](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmimoxh%2Fdsh-searxng-search%2Fdsh-vet%2Freport%2F.dsh-vet%2Fbadge.json)](https://github.com/mimoxh/dsh-searxng-search/blob/dsh-vet/report/.dsh-vet/report.json)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![node >= 20.3.0](https://img.shields.io/badge/node-%3E%3D20.3.0-brightgreen.svg)
 
@@ -9,7 +10,9 @@
 - **零依赖**：只用 Node 全局 `fetch` / `URL` / `AbortSignal`，不 import 任何包，无构建步骤。
 - **不改工具契约**：复用 DSH 的 web 能力 seam（`ctx.web`），模型侧仍然是原来的 `web_search` 工具，参数、结果卡片、引用格式全部不变。
 - **不影响 `web_fetch`**：抓取 URL 仍由随附的 `dsh-web-fetch-http` 提供。
-- **离线自测**：16 项检查（`npm test`），不需要网络、不需要安装依赖，其中一项专门拒绝带 UTF-8 BOM 的发布文件。
+- **不绑定 surface**：代码只注册 seam，桌面端与 `dsh web` / `dsh tui` / `dsh headless` 都能用；装进哪个 profile，就只有那个 surface 生效，见 [3. 安装](#3-安装) 的方式 E / F。
+- **可审计**：`package.json` 声明 `dsh.seams: ["web"]`，自测锁定它与 `inject` 一致；`dsh-vet` 在每次 push / PR 上审计，并把报告与等级公示在 `dsh-vet/report` 分支，见 [5. 验证](#5-验证)。
+- **离线自测**：17 项检查（`npm test`），不需要网络、不需要安装依赖，其中一项专门拒绝带 UTF-8 BOM 的发布文件。
 
 > **免责声明**：这是第三方项目，与 DeepSeek 官方无关，也不代表官方背书。
 > DSH 目前是 **developer preview**，本插件针对 `0.2.0-rc.2` 验证过；它依赖的 seam
@@ -166,6 +169,63 @@ Plugin Manager 做的就是这几步，手工做需要自己承担风险。以 p
 
 3. **完全重启 DSH**。
 
+### 方式 E：命令行装到任意 profile（其他 surface 首选）
+
+桌面端之外还有三个 surface，各自对应 `$DSH_HOME/profiles` 下的一个同名 profile：
+
+| surface | profile | 备注 |
+|---|---|---|
+| 桌面 App | `desktop` | Electron 专用：`dsh --profile desktop ...` 会被直接拒绝（`error: profile "desktop" is managed exclusively by the Electron application`），只能按方式 A 在 App 里装 |
+| `dsh web` / `dsh --profile web` | `web` | 浏览器 surface |
+| `dsh tui` | `tui` | 终端界面 |
+| `dsh headless "…"` | `headless` | 一次性任务，跑完退出 |
+
+**profile 之间互不相干**：`dsh.profile.bundles` 各写各的，本包装进哪一个，就只有那个
+surface 生效。DSH 自带的安装入口会跑 pnpm，并在包声明了 `dsh.bundle` 时把它追加进该
+profile 的 `bundles`（参数直接透传给 pnpm）：
+
+```bash
+dsh plugin --profile web add "D:/path/to/dsh-searxng-search"     # 本地目录（link:）
+dsh plugin --profile web add github:mimoxh/dsh-searxng-search    # Git（pnpm 的 github: 简写）
+```
+
+目标 profile 还不存在时，用 `--from-default-profile <shipped-template>` 从 shipped 模板
+初始化（`dsh --help` 里的例子是 `dsh rescue --from-default-profile web`）。
+
+装完仍是那一件事：让 `web` 行指向 searxng。组合包 patch 已经做了（只要包在 `bundles`
+里就会应用），所以通常只差实例地址——用下面的 overlay，或按 [4. 配置项](#4-配置项) 写进
+该 profile 自己的 `cordis.patch.yml`。
+
+### 方式 F：用 `--patch` overlay 覆盖配置（不改 profile 文件）
+
+`dsh` 支持在 profile 层之后再叠一层 patch，而且**可重复**：
+
+```bash
+export SEARXNG_BASE_URL=http://192.168.1.20:8086
+dsh web      --patch ./examples/dsh-searxng.overlay.yml
+dsh tui      --patch ./examples/dsh-searxng.overlay.yml
+dsh headless --patch ./examples/dsh-searxng.overlay.yml "搜索今天的新闻"
+```
+
+[`examples/dsh-searxng.overlay.yml`](examples/dsh-searxng.overlay.yml) 只重述两行
+**已经存在**的 row 的 `config`（`web` 与 `web-search-searxng`），不插入新 row——row 由
+组合包 patch 插入，所以前提是该 profile 里已装本包（方式 E 的安装那一步）。
+
+它的 `baseURL` 写成 `!!js process.env.SEARXNG_BASE_URL ?? '<占位>'`，在**组合期**取环境
+变量，同一个文件就能在不同机器/不同实例间复用，不必改任何文件；变量没设时占位地址会让
+provider 报 `WEB_PROVIDER_CONFIGURED_UNAVAILABLE`，而不是静默换一条搜索通道。
+
+### 装到其他 surface 时的两个坑
+
+1. **`web_search` 这个工具的归属，各 surface 不一样。** `dsh-base` 把 `tool-web` 放在
+   host plane（`dsh tui` / `dsh headless` 走这条）；`dsh-web-app` 则把它
+   `disabled: true` 掉，改由**每个 agent preset** 各自组合（桌面端与 `dsh web` 走这条）。
+   所以在 Web 类 surface 上，除了 provider，还要确认该 session 用的 preset 挂了
+   `tool-web`；否则 seam 里注册了提供方，也没有工具去调它。
+2. **生效/重启语义不同。** 桌面端是常驻 host，装或改组合包必须**完全退出并重启**（见
+   [7. 已知的 DSH 侧问题](#7-已知的-dsh-侧问题)）；`dsh tui` / `dsh web` /
+   `dsh headless` 每次启动都重新组合 profile，所以下一次启动即生效。
+
 ### 装完必做
 
 1. **改 `cordis.patch.yml` 的 `baseURL`**，指向你的实例。
@@ -192,10 +252,12 @@ DeepSeek」。
 | `safeSearch` | 不发送 | `0` / `1` / `2` |
 | `timeoutMs` | `15000` | 单次搜索超时（工具层还有 60s 预算） |
 | `maxResults` | `10` | 本提供方自己的上限；seam 还会再按 `web_search` 请求的上限截断 |
-| `userAgent` | `dsh-searxng-search/0.1.0` | 请求 UA（SearXNG 会拒绝空 UA） |
+| `userAgent` | `dsh-searxng-search/<包版本>` | 请求 UA（SearXNG 会拒绝空 UA）；默认值跟随 `package.json` 的 `version` |
 | `headers` | `{}` | 额外请求头，例如反向代理前的 `Authorization: Bearer <token>` |
 
-改动 `baseURL` 等配置后需要让组合包重新加载：**重启 DSH**。
+改动 `baseURL` 等配置后需要让组合包重新加载：桌面端**完全重启 DSH**，`dsh web` / `dsh tui` /
+`dsh headless` 下次启动即生效。同样的字段也可以写在 `--patch` overlay 里（见
+[3. 安装](#3-安装) 的方式 F），此时 `baseURL` 可用 `SEARXNG_BASE_URL` 兜底。
 
 ### 为什么没有配置 schema
 
@@ -227,9 +289,10 @@ SearXNG 的 `results[].url/title/content/publishedDate` → seam 的
 npm test        # 等价于 node test/smoke.mjs
 ```
 
-16 项检查覆盖：注册 id、可用性判断、User-Agent 与版本一致、**发布文件不带 UTF-8 BOM**、
-URL 构造、结果映射/去重/截断、真实 HTTP 往返（内置 mock SearXNG）、HTML（未开 JSON）
-报错、403（未开 JSON 格式）报错、429 报错、取消、不可达报错。
+17 项检查覆盖：注册 id、可用性判断、User-Agent 与版本一致、**`dsh.seams` 与 `inject`
+一致**、**发布文件不带 UTF-8 BOM**、URL 构造、结果映射/去重/截断、真实 HTTP 往返
+（内置 mock SearXNG）、HTML（未开 JSON）报错、403（未开 JSON 格式）报错、429 报错、
+取消、不可达报错。
 
 ### 5.2 在 DSH 里验证
 
@@ -238,6 +301,41 @@ URL 构造、结果映射/去重/截断、真实 HTTP 往返（内置 mock SearX
    处理建议。
 3. 若来源看起来不对或报 `WEB_PROVIDER_CONFIGURED_MISSING`，检查 profile 里 `web` 行
    是否仍写着 `deepseek-official`，以及是否忘了重启 DSH。
+
+### 5.3 安全自审（dsh-vet）
+
+本包在每次 push / PR 上跑 [dsh-vet](https://github.com/rogerdigital/dsh-vet)：
+[`.github/workflows/dsh-vet.yml`](.github/workflows/dsh-vet.yml) 审计的是 **`npm pack`
+出来的产物**（也就是 `files` 列出来的东西），并用 `strict: true` 让 high 及以上、且置信度
+≥ medium 的发现项直接让 CI 失败。
+
+审计产物而不是整仓是刻意的：整仓扫描会把 `test/smoke.mjs` 也算进能力面（它读 JSON、开
+mock HTTP 服务），多出三条与插件运行时无关的发现项——`fs` 读取计入
+`perm.seam-mismatch`（medium/medium，会把整仓扫描的等级压到 C）、`node:http` 仅 import、
+以及不可达文件。CI 因此只对产物定级。
+
+本地复现同一份扫描：
+
+```bash
+npm pack --pack-destination .dsh-vet-pack
+tar -xzf .dsh-vet-pack/*.tgz -C .dsh-vet-pack
+npx --yes dsh-vet@0.4.0 --json .dsh-vet-pack/package
+```
+
+0.2.0 的实测结果是 **A 级**，报告里仍留着两条发现项——这是真实的剩余状态，不是清干净的
+样板：
+
+| 严重度 / 置信度 | 规则 | 说明 |
+|---|---|---|
+| high / **low** | `egress.secret-adjacent` | `index.js` 读 `process.env.SEARXNG_BASE_URL`，而同一文件里有出网调用。按 dsh-vet 的契约，**低置信度不参与定级** |
+| info / high | `perm.network-client` | 声明 `dsh.seams: ["web"]` 后的正常清点项。未声明时它是 medium/high，等级会掉到 C |
+
+想彻底消掉那条 `egress.secret-adjacent`，只能改成经 DSH 的
+`@deepseek-ai/dsh-launch-environment` 读启动环境（对方 `dsh-searxng` 正是这么做的）——代价是
+本项目"零 import"的底线，所以这里选择保留并写明。
+
+等级徽章读 `dsh-vet/report` 分支上的报告（shields.io 直接读该分支的 `badge.json`，没有徽章
+服务），因此它要等仓库推送、workflow 至少跑过一次之后才会显示。
 
 ---
 
@@ -257,6 +355,9 @@ URL 构造、结果映射/去重/截断、真实 HTTP 往返（内置 mock SearX
 | 搜索有结果但模型看不到 | 确认用的是 `web_search` 而不是某个 MCP 工具；结果里的来源来自 seam 的 `sources[]` |
 | 结果为空 | SearXNG 的引擎本身没返回（可能是出网受限、`engines` 限制过窄、或 `categories` 不匹配）。先用 [2.3](#23-确认-dsh-所在机器能直接访问该实例) 的 `curl` 直接验证 SearXNG |
 | 插件卡片显示组件「已关闭」 | 运行中的 DSH 是在装插件**之前**启动的。完全重启 DSH |
+| `dsh tui` / `dsh headless` 上 `web_search` 仍走 DeepSeek | 该 profile 里没装本包——profile 之间互不相干，见 [3. 安装](#3-安装) 的方式 E |
+| overlay 启动后报 `WEB_PROVIDER_CONFIGURED_UNAVAILABLE` | `SEARXNG_BASE_URL` 没设（占位地址不是真实例），或该 profile 里还没装本包（overlay 只覆盖**已有** row 的 `config`） |
+| `dsh --profile desktop --dump-config` 报 profile 被独占 | 桌面端 profile 只能由 App 启动（`managed exclusively by the Electron application`）；换 `dsh web` / `dsh tui` 诊断，或用 App 里的插件管理器 |
 
 ---
 
@@ -271,6 +372,11 @@ dsh: profile reload requires the root Include entry
 这是 DSH 侧的 profile 热重载失败（`@deepseek-ai/dsh-app-boot` 的
 `reconcileProfilePatches()` 找不到根 Include 条目），**与本插件无关**。组合包的行本来
 就会在启动时组合，所以**完全重启 DSH 即可**，不需要（也无法）用那个开关。
+
+补充一条同源的差别：`desktop` profile 由 Electron **独占**——`dsh --profile desktop …`
+（包括 `--dump-config`）会直接报 `error: profile "desktop" is managed exclusively by the
+Electron application`。所以桌面端只能走 App 内的插件管理器，CLI 的那些诊断手段要用在
+`dsh web` / `dsh tui` 上（见 [3. 安装](#3-安装) 的方式 E、F）。
 
 ---
 
@@ -305,10 +411,12 @@ server，比如 `mcp-searxng`）：
 |---|---|
 | `index.js` | 提供方实现：`apply` / `inject`、配置规整、URL 构造、结果映射、错误码 |
 | `cordis.patch.yml` | 组合包 patch：固定 `web.searchProvider = searxng` + 挂载提供方行 |
-| `package.json` | 组合包清单（`dsh.bundle.patch`、展示元信息） |
+| `package.json` | 组合包清单（`dsh.bundle.patch`、`dsh.seams`、展示元信息） |
+| `examples/dsh-searxng.overlay.yml` | `dsh --patch` 用的 overlay（见 [3. 安装](#3-安装) 的方式 F） |
 | `locale/zh.json`、`locale/en.json` | 插件管理器卡片上的标题与描述 |
 | `test/smoke.mjs` | 离线自测（内置 mock SearXNG） |
 | `.github/workflows/ci.yml` | CI：Node 20.3/22/24 × Linux/Windows，另有 tarball 内容检查 |
+| `.github/workflows/dsh-vet.yml` | 安全自审：扫 `npm pack` 产物并公示报告与等级（见 [5. 验证](#5-验证)） |
 
 本地开发：
 
@@ -321,7 +429,8 @@ npm test
 修改 `index.js` 里的 `PACKAGE_VERSION` 时记得同步 `package.json` 的 `version`——
 自测里有一项专门检查这两者是否一致。
 
-> CI 徽标要等仓库推送、workflow 至少跑过一次之后才会显示。
+> CI 与 dsh-vet 徽标都要等仓库推送、对应 workflow 至少跑过一次之后才会显示：CI 徽标来自
+> `ci` workflow，dsh-vet 徽标来自 workflow 发布到 `dsh-vet/report` 分支的报告。
 
 ## License
 

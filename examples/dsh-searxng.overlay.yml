@@ -1,0 +1,34 @@
+# dsh-searxng.overlay.yml —— 用 `dsh --patch` 给某一次启动叠加的配置层。
+#
+# 用法（前提：该 profile 里已安装 dsh-searxng-search，见 README 方式 E）：
+#
+#   export SEARXNG_BASE_URL=http://192.168.1.20:8086
+#   dsh tui      --patch ./examples/dsh-searxng.overlay.yml
+#   dsh web      --patch ./examples/dsh-searxng.overlay.yml
+#   dsh headless --patch ./examples/dsh-searxng.overlay.yml "搜索今天的新闻"
+#
+# 本文件只覆盖两行**已经存在**的 row，不插入新 row：
+#   * `web-search-searxng` 由本包的组合包 patch 插入（只要包在该 profile 的
+#     dsh.profile.bundles 里就存在），这里只重写它的 config；
+#   * `web` 行固定 searchProvider。`fetchProvider: http` 必须一起重述 —— row patch
+#     是整块替换 config，漏掉它会让 web_fetch 失去随附的 HTTP 抓取提供方。
+#
+# `SEARXNG_BASE_URL` 在**组合期**求值，所以同一个文件能在任何机器上直接用，
+# 不必改下面的占位地址；未设置该变量时占位地址会让 provider 报
+# WEB_PROVIDER_CONFIGURED_UNAVAILABLE，而不是静默走别的搜索通道。
+
+- id: web
+  name: '@deepseek-ai/dsh-web'
+  config:
+    searchProvider: searxng
+    fetchProvider: http
+
+- id: web-search-searxng
+  name: 'dsh-searxng-search'
+  config:
+    baseURL: !!js process.env.SEARXNG_BASE_URL ?? 'http://searxng.example:8888'
+    language: zh-CN
+    categories: general
+    safeSearch: 0
+    timeoutMs: 15000
+    maxResults: 10

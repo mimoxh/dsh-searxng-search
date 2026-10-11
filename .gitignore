@@ -1,5 +1,6 @@
 node_modules/
 *.tgz
+.dsh-vet-pack/
 *.log
 .DS_Store
 Thumbs.db

@@ -28,7 +28,7 @@ export const SEARXNG_PROVIDER_ID = 'searxng'
  * this module deliberately imports nothing; `test/smoke.mjs` fails when it
  * drifts away from `package.json`.
  */
-const PACKAGE_VERSION = '0.1.0'
+const PACKAGE_VERSION = '0.2.0'
 
 /** SearXNG refuses requests without a `User-Agent`. */
 const DEFAULT_USER_AGENT = `dsh-searxng-search/${PACKAGE_VERSION}`
