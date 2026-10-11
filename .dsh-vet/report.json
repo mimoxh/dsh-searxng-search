@@ -1,0 +1,142 @@
+{
+  "schema": "dsh-vet/v1",
+  "target": {
+    "kind": "local-path",
+    "specifier": ".dsh-vet-pack/pkg/package"
+  },
+  "scanner": {
+    "name": "dsh-vet",
+    "version": "0.4.0",
+    "ranAt": "2026-10-11T19:32:13.475Z"
+  },
+  "summary": {
+    "grade": "A",
+    "counts": {
+      "critical": 0,
+      "high": 1,
+      "medium": 0,
+      "low": 0,
+      "info": 1
+    }
+  },
+  "findings": [
+    {
+      "id": "egress.secret-adjacent",
+      "title": "Network calls reachable from code that reads secrets",
+      "severity": "high",
+      "confidence": "low",
+      "evidence": [
+        {
+          "file": "index.js",
+          "line": 123,
+          "snippet": "const baseURL = (text(field(config, 'baseURL')) ?? text(process.env.SEARXNG_BASE_URL) ?? '').replace(/\\/+$/u, '')",
+          "note": "reads process.env; fetch in index.js:276 is statically reachable from here"
+        }
+      ],
+      "remediation": "Keep secret reads and network clients in separate modules, or document the intended data flow for each endpoint.",
+      "references": [
+        "https://github.com/rogerdigital/dsh-vet/blob/main/docs/rules/egress.secret-adjacent.md"
+      ]
+    },
+    {
+      "id": "perm.network-client",
+      "title": "Opens network connections",
+      "severity": "info",
+      "confidence": "high",
+      "evidence": [
+        {
+          "file": "index.js",
+          "line": 276,
+          "snippet": "response = await fetch(url, {",
+          "note": "seam \"web\" is declared"
+        }
+      ],
+      "remediation": "Declare the web seam in dsh.seams, or drop the network access.",
+      "references": [
+        "https://github.com/rogerdigital/dsh-vet/blob/main/docs/rules/perm.network-client.md"
+      ]
+    }
+  ],
+  "x-dsh-vet": {
+    "version": 1,
+    "profile": {
+      "analyzerRevision": "dsh-vet-analyzer/0.4.0",
+      "ruleCatalogRevision": "dsh-vet-rules/0.4.0",
+      "rules": [
+        "dep.floating-range",
+        "dep.install-scripts",
+        "dep.typosquat-proximity",
+        "egress.outbound-endpoints",
+        "egress.secret-adjacent",
+        "obf.charcode-chain",
+        "obf.dynamic-require",
+        "obf.encoded-payload",
+        "obf.eval-detect",
+        "obf.unparseable",
+        "perm.network-client",
+        "perm.seam-mismatch",
+        "perm.subprocess-spawn",
+        "perm.undeclared-fs-write",
+        "perm.unreachable-files",
+        "scan.empty-audit"
+      ],
+      "options": {},
+      "digest": "sha256:d7a8a54b7a8b562724668f6643a004e9384e64bcd97ce49e00a93691820198fd"
+    },
+    "coverage": {
+      "status": "partial",
+      "candidateJs": 1,
+      "parsed": 1,
+      "parseFailures": 0,
+      "failedFiles": [],
+      "entries": {
+        "resolved": [
+          "index.js"
+        ],
+        "unresolved": [
+          "./locale/*.json"
+        ]
+      },
+      "omissions": [],
+      "dependencyMode": "not-scanned",
+      "limitations": [
+        "dependencies are not scanned",
+        "non-JavaScript files and executables are not analyzed",
+        "static analysis cannot observe runtime-computed behavior"
+      ]
+    },
+    "subject": {
+      "packageName": "dsh-searxng-search",
+      "analysisInputDigest": "sha256:bc9f1575193baf740834edada7418129901132237fc751d1c99903f1e517ca68",
+      "digestKind": "dsh-vet/analysis-input@1"
+    },
+    "observations": [
+      {
+        "kind": "capability",
+        "file": "index.js",
+        "subject": "env"
+      },
+      {
+        "kind": "capability",
+        "file": "index.js",
+        "subject": "net"
+      }
+    ],
+    "findingIdentities": [
+      {
+        "rule": "egress.secret-adjacent",
+        "variant": "secret-adjacent",
+        "file": "index.js",
+        "subject": "secret-read-with-reachable-network",
+        "finding": 0
+      },
+      {
+        "rule": "perm.network-client",
+        "variant": "client",
+        "file": "index.js",
+        "subject": "runtime-target",
+        "finding": 1
+      }
+    ]
+  }
+}
