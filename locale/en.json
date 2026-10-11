@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "SearXNG Search",
+    "description": "Runs DSH's built-in web_search through an intranet SearXNG JSON API instead of the shipped DeepSeek search route."
+  }
+}

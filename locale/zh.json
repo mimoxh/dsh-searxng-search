@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "SearXNG 搜索",
+    "description": "让 DSH 的内置 web_search 通过内网 SearXNG 的 JSON API 检索，替代随附的 DeepSeek 搜索通道。"
+  }
+}

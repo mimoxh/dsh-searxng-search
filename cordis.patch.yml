@@ -1,0 +1,35 @@
+# dsh-searxng-search — point DSH's `web_search` at a SearXNG instance.
+#
+# This bundle's patch layer is applied after the `dsh-base` / `dsh-web-app`
+# layers, and the last write per row wins, so the two entries below override
+# the shipped DeepSeek search defaults.
+
+# 1) Pin the web seam's search backend to the provider mounted below.
+#    A row patch replaces the row's whole `config`, so `fetchProvider` is
+#    restated (the shipped HTTP fetch backend keeps serving `web_fetch`).
+- id: web
+  name: '@deepseek-ai/dsh-web'
+  config:
+    searchProvider: searxng
+    fetchProvider: http
+
+# 2) Mount the SearXNG provider and configure your instance.
+#    EDIT `baseURL` BEFORE installing: it is a placeholder, and the plugin
+#    reports `WEB_PROVIDER_CONFIGURED_UNAVAILABLE` until it names a real
+#    deployment (scheme, host, port and any path prefix, no trailing slash).
+#    Every other field is optional.
+- insert:
+    - id: web-search-searxng
+      name: 'dsh-searxng-search'
+      config:
+        baseURL: http://searxng.example:8888
+        # apiPath: /search          # default; change only if your instance mounts SearXNG elsewhere
+        language: zh-CN             # SearXNG `language` parameter, e.g. zh-CN, en-US, all
+        categories: general         # e.g. general, or general,news
+        # engines: google,bing      # restrict to specific SearXNG engines
+        # timeRange: month          # day | week | month | year
+        safeSearch: 0               # 0 | 1 | 2
+        timeoutMs: 15000
+        maxResults: 10
+        # headers:                  # extra request headers (for a gateway or reverse proxy in front of SearXNG)
+        #   Authorization: Bearer <token>

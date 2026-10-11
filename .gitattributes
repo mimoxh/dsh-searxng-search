@@ -1,0 +1,2 @@
+# Keep one stable line ending across Windows and Linux checkouts and CI runs.
+* text=auto eol=lf

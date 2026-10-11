@@ -1,0 +1,56 @@
+{
+  "name": "dsh-searxng-search",
+  "version": "0.1.0",
+  "description": "SearXNG search provider for the DSH web capability seam (ctx.web): run DSH's built-in web_search against a SearXNG instance instead of the shipped DeepSeek search route.",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "author": "mimoxh (https://github.com/mimoxh)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mimoxh/dsh-searxng-search.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mimoxh/dsh-searxng-search/issues"
+  },
+  "homepage": "https://github.com/mimoxh/dsh-searxng-search#readme",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "searxng",
+    "web-search",
+    "cordis"
+  ],
+  "engines": {
+    "node": ">=20.3.0"
+  },
+  "scripts": {
+    "test": "node test/smoke.mjs"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": "^0.2.0-rc.2",
+    "@deepseek-ai/dsh-web": "^0.2.0-rc.2"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "meta": {
+    "title": "SearXNG Search",
+    "description": "Runs DSH's built-in web_search through a SearXNG JSON API instead of the shipped DeepSeek search route."
+  }
+}
